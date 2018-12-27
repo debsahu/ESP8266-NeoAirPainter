@@ -1,21 +1,22 @@
 #include <FS.h>
 #include <ESP8266WiFi.h>
 #include <ESP8266mDNS.h>
-#include <ArduinoJson.h>
+#include <ArduinoJson.h>           //https://github.com/bblanchon/ArduinoJson
 #include <Hash.h>
-#include <ESPAsyncTCP.h>       //https://github.com/me-no-dev/ESPAsyncTCP
-#include <ESPAsyncWebServer.h> //https://github.com/me-no-dev/ESPAsyncWebServer
+#include <ESPAsyncTCP.h>           //https://github.com/me-no-dev/ESPAsyncTCP
+#include <ESPAsyncWebServer.h>     //https://github.com/me-no-dev/ESPAsyncWebServer
 #include <SPIFFSEditor.h>
-#include <ESPAsyncWiFiManager.h> //https://github.com/alanswx/ESPAsyncWiFiManager
-#include <ESPAsyncDNSServer.h>   //https://github.com/devyte/ESPAsyncDNSServer
+#include <ESPAsyncWiFiManager.h>   //https://github.com/alanswx/ESPAsyncWiFiManager
+#include <ESPAsyncDNSServer.h>     //https://github.com/devyte/ESPAsyncDNSServer
 // #include <DNSServer.h>
 #include <Ticker.h>
 #include <pgmspace.h>
-#include <NeoPixelBrightnessBus.h>
+#include <NeoPixelBrightnessBus.h> //https://github.com/Makuna/NeoPixelBus
 #include <NeoPixelAnimator.h>
 
 #define HOSTNAME "NeoAirPainter"
 #define HTTP_PORT 80
+#define DNS_PORT 53
 
 const uint16_t PixelCount = 120; // the sample images are meant for 144 pixels
 const uint16_t AnimCount = 1;    // we only need one
@@ -97,7 +98,7 @@ bool processJson(String &message)
 {
     //const size_t bufferSize = JSON_OBJECT_SIZE(1) + 20;
     DynamicJsonBuffer jsonBuffer;
-    JsonObject& root = jsonBuffer.parseObject(message);
+    JsonObject &root = jsonBuffer.parseObject(message);
 
     if (!root.success())
     {
@@ -107,13 +108,16 @@ bool processJson(String &message)
 
     if (root.containsKey("brightness"))
     {
-        const char* brighness_str = root["brightness"];
+        const char *brighness_str = root["brightness"];
         Serial.printf("Brighness JSON parsed: %s\n", brighness_str);
-        if(strcmp(brighness_str, "up") == 0) {
-            brightness = constrain(brightness*2, 1, 255);
+        if (strcmp(brighness_str, "up") == 0)
+        {
+            brightness = constrain(brightness * 2, 1, 255);
             Serial.printf("Brighness[+]: %d\n", brightness);
-        } else if(strcmp(brighness_str, "down") == 0) {
-            brightness = constrain(brightness/1.5, 1, 255);
+        }
+        else if (strcmp(brighness_str, "down") == 0)
+        {
+            brightness = constrain(brightness / 1.5, 1, 255);
             Serial.printf("Brighness[-]: %d\n", brightness);
         }
         brightness = constrain(brightness, 1, 255);
@@ -121,18 +125,21 @@ bool processJson(String &message)
 
     if (root.containsKey("speed"))
     {
-        const char* speed_str = root["speed"];
+        const char *speed_str = root["speed"];
         Serial.printf("Speed JSON parsed: %s\n", speed_str);
-        if(strcmp(speed_str, "up") == 0) {
-            speed = constrain(speed-1, 1, 32767);  // Smaller number means faster animations
+        if (strcmp(speed_str, "up") == 0)
+        {
+            speed = constrain(speed - 1, 1, 32767); // Smaller number means faster animations
             Serial.printf("Speed[+]: %d\n", speed);
-        } else if(strcmp(speed_str, "down") == 0) {
-            speed = constrain(speed+1, 1, 32767);  // Larger number means slower animations
+        }
+        else if (strcmp(speed_str, "down") == 0)
+        {
+            speed = constrain(speed + 1, 1, 32767); // Larger number means slower animations
             Serial.printf("Speed[-]: %d\n", speed);
         }
         changeAnimationSpeed(speed);
     }
-    
+
     jsonBuffer.clear();
     return true;
 }
@@ -168,22 +175,35 @@ void setup()
     snprintf(chipId, sizeof(chipId), "%06x", ESP.getChipId());
     snprintf(NameChipId, sizeof(NameChipId), "%s_%06x", HOSTNAME, ESP.getChipId());
 
-    WiFi.mode(WIFI_AP_STA);
+    WiFi.mode(WIFI_STA);
     WiFi.hostname(const_cast<char *>(NameChipId));
     AsyncWiFiManager wifiManager(&server, &dns); //Local intialization. Once its business is done, there is no need to keep it around
-    wifiManager.setConfigPortalTimeout(180);     //sets timeout until configuration portal gets turned off, useful to make it all retry or go to sleep in seconds
+    wifiManager.setConfigPortalTimeout(180);      //sets timeout until configuration portal gets turned off, useful to make it all retry or go to sleep in seconds
 
     if (!wifiManager.autoConnect(NameChipId))
     {
-        Serial.println("Failed to connect and hit timeout");
-        ESP.restart();
+        Serial.println("Failed to connect and hit timeout\nEntering Station Mode");
+        WiFi.mode(WIFI_AP);
+        WiFi.hostname(const_cast<char *>(NameChipId));
+        IPAddress apIP(192, 168, 1, 1);
+        WiFi.softAPConfig(apIP, apIP, IPAddress(255, 255, 255, 0));
+        WiFi.softAP(NameChipId);
+        Serial.println("");
+        Serial.print("HotSpt IP: ");
+        Serial.println(WiFi.softAPIP());
+        dns=AsyncDNSServer();
+        dns.setTTL(300);
+        dns.setErrorReplyCode(AsyncDNSReplyCode::ServerFailure);
+        dns.start(DNS_PORT, "*", WiFi.softAPIP());
     }
-    Serial.println("");
-    Serial.print(F("Connected with IP: "));
-    Serial.println(WiFi.localIP());
-
-    ws.onEvent([](AsyncWebSocket *server, AsyncWebSocketClient *client, AwsEventType type, void *arg, uint8_t *data, size_t len)
+    else
     {
+        Serial.println("");
+        Serial.print(F("Connected with IP: "));
+        Serial.println(WiFi.localIP());
+    }
+
+    ws.onEvent([](AsyncWebSocket *server, AsyncWebSocketClient *client, AwsEventType type, void *arg, uint8_t *data, size_t len) {
         if (type == WS_EVT_CONNECT)
         {
             Serial.printf("ws[%s][%u] connect\n", server->url(), client->id());
@@ -214,7 +234,7 @@ void setup()
                         msg += (char)data[i];
                     }
                     Serial.println(msg);
-                    Serial.println( processJson(msg) ? "Success" : "Failed" ); 
+                    Serial.println(processJson(msg) ? "Success" : "Failed");
                 }
             }
         }
@@ -267,25 +287,25 @@ void setup()
         animStart.once(1, readImage);
         request->redirect("/");
     });
-    server.on("/stop", HTTP_GET, [](AsyncWebServerRequest *request){
+    server.on("/stop", HTTP_GET, [](AsyncWebServerRequest *request) {
         animations.StopAnimation(0);
         animState = 0;
         request->redirect("/");
     });
     server.on("/brightnessup", HTTP_GET, [](AsyncWebServerRequest *request) {
-        brightness = constrain(brightness*2, 1, 255);
+        brightness = constrain(brightness * 2, 1, 255);
         request->redirect("/");
     });
-    server.on("/brightnessdown", HTTP_GET, [](AsyncWebServerRequest *request){
-        brightness = constrain(brightness/1.5, 1, 255);
+    server.on("/brightnessdown", HTTP_GET, [](AsyncWebServerRequest *request) {
+        brightness = constrain(brightness / 1.5, 1, 255);
         request->redirect("/");
     });
     server.on("/speedup", HTTP_GET, [](AsyncWebServerRequest *request) {
-        speed = constrain(speed-1, 1, 32767);
+        speed = constrain(speed - 1, 1, 32767);
         request->redirect("/");
     });
-    server.on("/speeddown", HTTP_GET, [](AsyncWebServerRequest *request){
-        speed = constrain(speed+1, 1, 32767);
+    server.on("/speeddown", HTTP_GET, [](AsyncWebServerRequest *request) {
+        speed = constrain(speed + 1, 1, 32767);
         request->redirect("/");
     });
     // server.on("/upload", HTTP_GET, [](AsyncWebServerRequest *request) {
