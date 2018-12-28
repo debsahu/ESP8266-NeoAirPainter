@@ -26,3 +26,7 @@ Based on the idea of [Minimalistic Async code around Async E131 for ESP8266/ESP3
 |ESPAsyncDNSServer          |https://github.com/devyte/ESPAsyncDNSServer                 |
 |ESP Async WebServer        |https://github.com/me-no-dev/ESPAsyncWebServer              |
 |ArduinoJson                |https://github.com/bblanchon/ArduinoJson                    |
+
+## Hardware Setup
+
+![Hardware Setup](https://github.com/debsahu/ESP8266-NeoAirPainter/blob/master/hardware-setup.png)
