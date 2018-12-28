@@ -4,7 +4,7 @@
 
 Based on the idea of [Minimalistic Async code around Async E131 for ESP8266/ESP32](https://github.com/debsahu/E131_PixelPusher) but for offline purpose using 24-bit BMP files
 
-- Reads (image.bmp) BMP file from SPIFFS and displays the rows on NeoPixel LED string
+- Reads (image.bmp) BMP file from SPIFFS and displays the columns on NeoPixel LED string
 - Completely Async
 - WiFiManager Captive Portal to get WiFi credentials (Compile with -DUSE_EADNS)
 - Waits 180s on WiFiManager to conenct to AP, then fails into stand-alone AP mode
