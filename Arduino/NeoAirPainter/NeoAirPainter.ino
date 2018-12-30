@@ -104,7 +104,7 @@ void gammaBrightness(uint8_t _brightness)
 
 void BMPGammaBrightness(uint8_t _brightness)
 {
-    for (uint16_t index = 0; index < image.Height(); index++)
+    for (uint16_t index = 0; index < std::min(image.Height(), PixelCount); index++)
     {
         RgbColor color = image.GetPixelColor(animState, index);
         color = gammaColor.Correct(color);
@@ -363,7 +363,7 @@ void setup()
     // });
     server.on("/upload", HTTP_POST, [](AsyncWebServerRequest *request) {
         animStart.once(1, readImage);
-        AsyncWebServerResponse *response = request->beginResponse(200, "text/html", "<META http-equiv='refresh' content='2;URL=/'>Update Success, redirecting to main page ...");
+        AsyncWebServerResponse *response = request->beginResponse(200, "text/html", "<META http-equiv='refresh' content='2;URL=/'>Upload Success, redirecting to main page ...");
         //response->addHeader("Connection", "close");
         request->send(response); },
               [](AsyncWebServerRequest *request, String filename, size_t index, uint8_t *data, size_t len, bool final) {
@@ -376,8 +376,8 @@ void setup()
                   {
                       Serial.printf("UploadStart: %s\n", filename.c_str());
                       //if (!filename.startsWith("/")) filename = "/" + filename;
-                      if (SPIFFS.exists("image.bmp"))
-                          SPIFFS.remove("image.bmp");
+                      if (SPIFFS.exists("/image.bmp"))
+                          SPIFFS.remove("/image.bmp");
                       fsUploadFile = SPIFFS.open("/image.bmp", "w"); //write all bmp file data to image.bmp
                   }
                   for (size_t i = 0; i < len; i++)
