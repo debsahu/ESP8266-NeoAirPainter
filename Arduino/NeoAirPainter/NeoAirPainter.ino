@@ -15,6 +15,9 @@
 #include <NeoPixelAnimator.h>
 #include "version.h"
 
+// Soft AP is at 192.168.1.1
+char AP_PASS[32] = ""; //passowrd for Soft AP mode connection
+
 //BMP image scrolling too slow? read below ▼
 //Uncomment the line below to display image from top to bottom instead of default left to right
 //Top to Bottom BMP image read is FASTER and can give higher control over the animation speed
@@ -39,6 +42,7 @@ uint16_t speed = 30;
 
 Ticker animStart;
 
+bool startMDNS = true;
 AsyncWebServer server(HTTP_PORT);
 AsyncWebSocket ws("/ws");
 AsyncDNSServer dns;
@@ -219,7 +223,7 @@ void setup()
     snprintf(chipId, sizeof(chipId), "%06x", ESP.getChipId());
     snprintf(NameChipId, sizeof(NameChipId), "%s_%06x", HOSTNAME, ESP.getChipId());
 
-    WiFi.mode(WIFI_STA);
+    WiFi.mode(WIFI_AP_STA);
     WiFi.hostname(const_cast<char *>(NameChipId));
     AsyncWiFiManager wifiManager(&server, &dns); //Local intialization. Once its business is done, there is no need to keep it around
     wifiManager.setConfigPortalTimeout(180);      //sets timeout until configuration portal gets turned off, useful to make it all retry or go to sleep in seconds
@@ -227,25 +231,25 @@ void setup()
     if (!wifiManager.autoConnect(NameChipId))
     {
         Serial.println("Failed to connect and hit timeout\nEntering Station Mode");
-        WiFi.mode(WIFI_AP);
-        WiFi.hostname(const_cast<char *>(NameChipId));
-        IPAddress apIP(192, 168, 1, 1);
-        WiFi.softAPConfig(apIP, apIP, IPAddress(255, 255, 255, 0));
-        WiFi.softAP(NameChipId);
-        Serial.println("");
-        Serial.print("HotSpt IP: ");
-        Serial.println(WiFi.softAPIP());
-        dns=AsyncDNSServer();
-        dns.setTTL(300);
-        dns.setErrorReplyCode(AsyncDNSReplyCode::ServerFailure);
-        dns.start(DNS_PORT, "*", WiFi.softAPIP());
     }
     else
     {
-        Serial.println("");
-        Serial.print(F("Connected with IP: "));
+        Serial.println("---------------------------------------");
+        Serial.print("Router IP: ");
         Serial.println(WiFi.localIP());
+        //ESP.restart();
+        //nothing to do here, entering AP mode
+        startMDNS = false;
     }
+
+    Serial.println("---------------------------------------");
+    IPAddress apIP(192, 168, 1, 1);
+    WiFi.softAPConfig(apIP, apIP, IPAddress(255, 255, 255, 0));
+    WiFi.softAP(NameChipId, AP_PASS);
+    Serial.print("HotSpt IP: ");
+    Serial.println(WiFi.softAPIP());
+    dns=AsyncDNSServer();
+    dns.start(DNS_PORT, "*", WiFi.softAPIP());
 
     ws.onEvent([](AsyncWebSocket *server, AsyncWebSocketClient *client, AwsEventType type, void *arg, uint8_t *data, size_t len) {
         if (type == WS_EVT_CONNECT)
@@ -289,6 +293,20 @@ void setup()
     });
     server.on("/version", HTTP_GET, [](AsyncWebServerRequest *request) {
         request->send(200, "text/plain", SKETCH_VERSION);
+    });
+    server.on("/restart", HTTP_GET, [](AsyncWebServerRequest *request) {
+        Serial.println("/restart");
+        request->send(200, "text/html", "<META http-equiv='refresh' content='15;URL=/'> Restarting...");
+        ESP.restart();
+    });
+    server.on("/reset_wlan", HTTP_GET, [](AsyncWebServerRequest *request) {
+        Serial.println("/reset_wlan");
+        request->send(200, "text/html", "<META http-equiv='refresh' content='15;URL=/'> Resetting WLAN and restarting...");
+        server.reset();
+        dns=AsyncDNSServer();
+        AsyncWiFiManager wifiManager(&server, &dns);
+        wifiManager.resetSettings();
+        ESP.restart();
     });
     server.on("/favicon.ico", HTTP_GET, [](AsyncWebServerRequest *request) {
         AsyncWebServerResponse *response = request->beginResponse_P(200, "image/x-icon", favicon_ico_gz, favicon_ico_gz_len);
@@ -499,19 +517,23 @@ void setup()
             }
         }
 
-        request->send(404);
+        // request->send(404);
+        request->redirect("/"); // send all DNS requests to root
+        //request->send_P(200, "text/html", root_html);
     });
     server.addHandler(new SPIFFSEditor("admin", "admin"));
 
-    MDNS.setInstanceName(String(HOSTNAME " (" + String(chipId) + ")").c_str());
-    if (MDNS.begin(HOSTNAME))
-    {
-        MDNS.addService("http", "tcp", HTTP_PORT);
-        Serial.printf(">>> MDNS Started: http://%s.local/\n", NameChipId);
-    }
-    else
-    {
-        Serial.println(F(">>> Error setting up mDNS responder <<<"));
+    if(startMDNS) {
+        MDNS.setInstanceName(String(HOSTNAME " (" + String(chipId) + ")").c_str());
+        if (MDNS.begin(HOSTNAME))
+        {
+            MDNS.addService("http", "tcp", HTTP_PORT);
+            Serial.printf(">>> MDNS Started: http://%s.local/\n", NameChipId);
+        }
+        else
+        {
+            Serial.println(F(">>> Error setting up mDNS responder <<<"));
+        }
     }
 
     server.begin();
