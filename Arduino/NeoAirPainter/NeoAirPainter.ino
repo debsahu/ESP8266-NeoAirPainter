@@ -6,13 +6,20 @@
 #include <ESPAsyncTCP.h>           //https://github.com/me-no-dev/ESPAsyncTCP
 #include <ESPAsyncWebServer.h>     //https://github.com/me-no-dev/ESPAsyncWebServer
 #include <SPIFFSEditor.h>
-#include <ESPAsyncWiFiManager.h>   //https://github.com/alanswx/ESPAsyncWiFiManager
 #include <ESPAsyncDNSServer.h>     //https://github.com/devyte/ESPAsyncDNSServer
-// #include <DNSServer.h>
+// #include <DNSServer.h>          //https://github.com/me-no-dev/ESPAsyncUDP
+#include "src/dependencies/ESPAsyncWiFiManager/ESPAsyncWiFiManager.h" //Copy of https://github.com/alanswx/ESPAsyncWiFiManager with #define USE_EADNS as of 1/4/19
 #include <Ticker.h>
-#include <pgmspace.h>
+#include <algorithm>
 #include <NeoPixelBrightnessBus.h> //https://github.com/Makuna/NeoPixelBus
 #include <NeoPixelAnimator.h>
+#include "version.h"
+
+//BMP image scrolling too slow? read below ▼
+//Uncomment the line below to display image from top to bottom instead of default left to right
+//Top to Bottom BMP image read is FASTER and can give higher control over the animation speed
+//If using top to bottom approach, remember to rotate BMP by 90deg clockwise before upload!!!!!
+#define TOP_TO_BOTTOM_METHOD
 
 #define HOSTNAME "NeoAirPainter"
 #define HTTP_PORT 80
@@ -67,10 +74,43 @@ const uint8_t favicon_ico_gz[] PROGMEM = {
 
 File fsUploadFile;
 bool shouldReboot = false;
-const char update_html[] PROGMEM = R"=====(<!DOCTYPE html><html lang="en"><head><title>Firware Update</title><meta http-equiv="Content-Type" content="text/html; charset=utf-8"><meta name="viewport" content="width=device-width"><link rel="icon" href="favicon.ico" type="image/x-icon"><link rel="shortcut icon" href="favicon.ico" type="image/x-icon"></head><body><h3>Update Firmware</h3><br><form method="POST" action="/update" enctype="multipart/form-data"><input type="file" name="update"> <input type="submit" value="Update"></form></body></html>)=====";
-const char root_html[] PROGMEM = R"=====(
-<html><head><head><title>NeoAirPainter</title><meta http-equiv="Content-Type" content="text/html; charset=utf-8"><meta name="viewport" content="width=device-width"><link rel="icon" href="favicon.ico" type="image/x-icon"><link rel="shortcut icon" href="favicon.ico" type="image/x-icon"><script>!function(e,n){"function"==typeof define&&define.amd?define([],n):"undefined"!=typeof module&&module.exports?module.exports=n():e.ReconnectingWebSocket=n()}(this,function(){function e(n,t,o){function c(e,n){var t=document.createEvent("CustomEvent");return t.initCustomEvent(e,!1,!1,n),t}var i={debug:!1,automaticOpen:!0,reconnectInterval:1e3,maxReconnectInterval:3e4,reconnectDecay:1.5,timeoutInterval:2e3};o||(o={});for(var r in i)this[r]="undefined"!=typeof o[r]?o[r]:i[r];this.url=n,this.reconnectAttempts=0,this.readyState=WebSocket.CONNECTING,this.protocol=null;var s,u=this,d=!1,a=!1,l=document.createElement("div");l.addEventListener("open",function(e){u.onopen(e)}),l.addEventListener("close",function(e){u.onclose(e)}),l.addEventListener("connecting",function(e){u.onconnecting(e)}),l.addEventListener("message",function(e){u.onmessage(e)}),l.addEventListener("error",function(e){u.onerror(e)}),this.addEventListener=l.addEventListener.bind(l),this.removeEventListener=l.removeEventListener.bind(l),this.dispatchEvent=l.dispatchEvent.bind(l),this.open=function(n){s=new WebSocket(u.url,t||[]),n||l.dispatchEvent(c("connecting")),(u.debug||e.debugAll)&&console.debug("ReconnectingWebSocket","attempt-connect",u.url);var o=s,i=setTimeout(function(){(u.debug||e.debugAll)&&console.debug("ReconnectingWebSocket","connection-timeout",u.url),a=!0,o.close(),a=!1},u.timeoutInterval);s.onopen=function(){clearTimeout(i),(u.debug||e.debugAll)&&console.debug("ReconnectingWebSocket","onopen",u.url),u.protocol=s.protocol,u.readyState=WebSocket.OPEN,u.reconnectAttempts=0;var t=c("open");t.isReconnect=n,n=!1,l.dispatchEvent(t)},s.onclose=function(t){if(clearTimeout(i),s=null,d)u.readyState=WebSocket.CLOSED,l.dispatchEvent(c("close"));else{u.readyState=WebSocket.CONNECTING;var o=c("connecting");o.code=t.code,o.reason=t.reason,o.wasClean=t.wasClean,l.dispatchEvent(o),n||a||((u.debug||e.debugAll)&&console.debug("ReconnectingWebSocket","onclose",u.url),l.dispatchEvent(c("close")));var i=u.reconnectInterval*Math.pow(u.reconnectDecay,u.reconnectAttempts);setTimeout(function(){u.reconnectAttempts++,u.open(!0)},i>u.maxReconnectInterval?u.maxReconnectInterval:i)}},s.onmessage=function(n){(u.debug||e.debugAll)&&console.debug("ReconnectingWebSocket","onmessage",u.url,n.data);var t=c("message");t.data=n.data,l.dispatchEvent(t)},s.onerror=function(n){(u.debug||e.debugAll)&&console.debug("ReconnectingWebSocket","onerror",u.url,n),l.dispatchEvent(c("error"))}},1==this.automaticOpen&&this.open(!1),this.send=function(n){if(s)return(u.debug||e.debugAll)&&console.debug("ReconnectingWebSocket","send",u.url,n),s.send(n);throw"INVALID_STATE_ERR : Pausing to reconnect websocket"},this.close=function(e,n){"undefined"==typeof e&&(e=1e3),d=!0,s&&s.close(e,n)},this.refresh=function(){s&&s.close()}}return e.prototype.onopen=function(){},e.prototype.onclose=function(){},e.prototype.onconnecting=function(){},e.prototype.onmessage=function(){},e.prototype.onerror=function(){},e.debugAll=!1,e.CONNECTING=WebSocket.CONNECTING,e.OPEN=WebSocket.OPEN,e.CLOSING=WebSocket.CLOSING,e.CLOSED=WebSocket.CLOSED,e})</script><script>function LoadBody(){wsc=new ReconnectingWebSocket("ws://"+window.location.hostname+"/ws"),wsc.timeoutInterval=3e3,wsc.onopen=function(e){console.log("WebSocketClient connected:",e)}}function previewFile(){var e=document.querySelector("img"),n=document.querySelector("input[type=file]").files[0],s=new FileReader;s.onloadend=function(){e.src=s.result},n?s.readAsDataURL(n):e.src=""}function BrightnessUp(){var e={brightness:"up"};wsc.send(JSON.stringify(e))}function BrightnessDown(){var e={brightness:"down"};wsc.send(JSON.stringify(e))}function SpeedUp(){var e={speed:"up"};wsc.send(JSON.stringify(e))}function SpeedDown(){var e={speed:"down"};wsc.send(JSON.stringify(e))}var wsc;previewFile()</script><style>#bribt,#speedbt{padding:15px 32px}body{width:100%;height:100%;margin:auto;text-align:center;background-color:#251758}#wrapper{width:325px;height:575px;border:2px solid #605293;border-radius:8px;margin:25px auto auto;background-color:#877CB0}#bribt,#subbt{border:none;color:#fff;text-align:center;margin:auto;display:inline-block;font-size:20px;text-decoration:none}#subbt{background-color:#008CBA;padding:15px 50px;border-radius:8px}#bribt{background-color:#781424;border-radius:8px}#speedbt{text-align:center;margin:auto;background-color:#FAA;border:none;color:#000;text-decoration:none;display:inline-block;font-size:20px;border-radius:8px}.upload-btn-wrapper{position:relative;overflow:hidden;display:inline-block}.btn{border:2px solid gray;color:gray;background-color:#fff;padding:8px 20px;border-radius:8px;font-size:20px;font-weight:700}.upload-btn-wrapper input[type=file]{font-size:100px;position:absolute;left:0;top:0;opacity:0}a{color:#fff;text-decoration:none}#github a{color:#ff69b4;text-decoration:none}</style></head><body onload="LoadBody()"><div id="wrapper"><form method="POST" action="/upload" enctype="multipart/form-data"><br><br><img src="/image.bmp" height="200" alt="Upload BMP File to see preview"><br><br><div class="upload-btn-wrapper"><button class="btn">Select BMP file</button> <input type="file" name="myfile" type="file" onchange="previewFile()" accept="image/bmp"></div><br><br><input id="subbt" type="submit" value="Upload"><br><br></form><input id="bribt" type="button" value="Bri(+)" onclick="BrightnessUp()">&nbsp;&nbsp;&nbsp;<input id="bribt" type="button" value="Bri(-)" onclick="BrightnessDown()"><br><br><input id="speedbt" type="button" value="Speed(+)" onclick="SpeedUp()">&nbsp;&nbsp;&nbsp;<input id="speedbt" type="button" value="Speed(-)" onclick="SpeedDown()"></div><br><a href="/update">Firmware Update</a><br><br><div id="github"><a href="https://github.com/debsahu/ESP8266-NeoAirPainter">ESP8266 NeoAirPainter</a></div></body></head></html>
-)=====";
+extern const char update_html[];
+extern const char root_html[];
+
+void BMPGammaBrightness(uint8_t _brightness)
+{
+#ifdef TOP_TO_BOTTOM_METHOD
+    for (uint16_t index = 0; index < std::min(image.Width(), PixelCount); index++)
+    {
+        RgbColor color = strip.GetPixelColor(index);
+#else
+    for (uint16_t index = 0; index < std::min(image.Height(), PixelCount); index++)
+    {
+        RgbColor color = image.GetPixelColor(animState, index);
+#endif
+        color = gammaColor.Correct(color);
+        strip.SetPixelColor(index, color);
+    }
+    strip.SetBrightness(_brightness);
+}
+
+void LoopAnimUpdate(const AnimationParam &param)
+{
+    if (param.state == AnimationState_Completed)
+    {
+        animations.RestartAnimation(param.index);         // done, time to restart this position tracking animation/timer
+
+        #ifndef TOP_TO_BOTTOM_METHOD
+        //new method reads left to right of BMP
+        animState = (animState + 1) % image.Width();     // increment and wrap
+        #else
+        // old method reads top to bottom of BMP
+        image.Blt(strip, 0, 0, animState, image.Width()); // draw the complete row at animState to the complete strip
+        animState = (animState + 1) % image.Height();     // increment and wrap
+        #endif
+        BMPGammaBrightness(brightness);
+    }
+}
 
 void readImage(void)
 {
@@ -89,45 +129,6 @@ void readImage(void)
 
     animState = 0; // we use the index 0 animation to time how often we rotate all the pixels
     animations.StartAnimation(0, speed, LoopAnimUpdate);
-}
-
-void gammaBrightness(uint8_t _brightness)
-{
-    for (uint16_t index = 0; index < strip.PixelCount() - 1; index++)
-    {
-        RgbColor color = strip.GetPixelColor(index);
-        color = gammaColor.Correct(color);
-        strip.SetPixelColor(index, color);
-    }
-    strip.SetBrightness(_brightness);
-}
-
-void BMPGammaBrightness(uint8_t _brightness)
-{
-    for (uint16_t index = 0; index < std::min(image.Height(), PixelCount); index++)
-    {
-        RgbColor color = image.GetPixelColor(animState, index);
-        color = gammaColor.Correct(color);
-        strip.SetPixelColor(index, color);
-    }
-    strip.SetBrightness(_brightness);
-}
-
-void LoopAnimUpdate(const AnimationParam &param)
-{
-    if (param.state == AnimationState_Completed)
-    {
-        animations.RestartAnimation(param.index);         // done, time to restart this position tracking animation/timer
-
-        //new method reads left to right of BMP
-        BMPGammaBrightness(brightness);
-        animState = (animState + 1) % image.Width();     // increment and wrap
-
-        // old method reads top to bottom of BMP
-        // image.Blt(strip, 0, 0, animState, image.Width()); // draw the complete row at animState to the complete strip
-        // animState = (animState + 1) % image.Height();     // increment and wrap
-        // gammaBrightness(brightness);
-    }
 }
 
 void changeAnimationSpeed(uint16_t _speed)
@@ -285,6 +286,9 @@ void setup()
     server.addHandler(&ws);
     server.on("/", HTTP_GET, [](AsyncWebServerRequest *request) {
         request->send_P(200, "text/html", root_html);
+    });
+    server.on("/version", HTTP_GET, [](AsyncWebServerRequest *request) {
+        request->send(200, "text/plain", SKETCH_VERSION);
     });
     server.on("/favicon.ico", HTTP_GET, [](AsyncWebServerRequest *request) {
         AsyncWebServerResponse *response = request->beginResponse_P(200, "image/x-icon", favicon_ico_gz, favicon_ico_gz_len);
