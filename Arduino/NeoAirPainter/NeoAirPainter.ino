@@ -8,7 +8,11 @@
 #include <SPIFFSEditor.h>
 #include <ESPAsyncDNSServer.h>     //https://github.com/devyte/ESPAsyncDNSServer
 // #include <DNSServer.h>          //https://github.com/me-no-dev/ESPAsyncUDP
+#ifdef PIO_PLATFORM
+#include <ESPAsyncWiFiManager.h>  //https://github.com/alanswx/ESPAsyncWiFiManager
+#else
 #include "src/dependencies/ESPAsyncWiFiManager/ESPAsyncWiFiManager.h" //Copy of https://github.com/alanswx/ESPAsyncWiFiManager with #define USE_EADNS as of 1/4/19
+#endif
 #include <Ticker.h>
 #include <algorithm>
 #include <NeoPixelBrightnessBus.h> //https://github.com/Makuna/NeoPixelBus
