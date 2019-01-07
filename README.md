@@ -1,6 +1,6 @@
 # ESP8266-NeoAirPainter
 
-[![Build Status](https://travis-ci.com/debsahu/ESP8266-NeoAirPainter.svg?branch=master)](https://travis-ci.com/debsahu/ESP8266-NeoAirPainter) [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT) [![version](https://img.shields.io/badge/version-v1.2.1-blue.svg)](https://github.com/debsahu/ESP8266-NeoAirPainter/blob/master/Arduino/NeoAirPainter/version.h)
+[![Build Status](https://travis-ci.com/debsahu/ESP8266-NeoAirPainter.svg?branch=master)](https://travis-ci.com/debsahu/ESP8266-NeoAirPainter) [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT) [![version](https://img.shields.io/github/release/debsahu/ESP8266-NeoAirPainter.svg)](https://github.com/debsahu/ESP8266-NeoAirPainter/blob/master/Arduino/NeoAirPainter/version.h)
 
 Based on the idea of [Minimalistic Async code around Async E131 for ESP8266/ESP32](https://github.com/debsahu/E131_PixelPusher) but for offline purpose using 24-bit BMP files
 
